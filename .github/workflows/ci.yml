@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ['master', 'fix/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        # Targets are listed explicitly: the 'ui' target is ALL and would run
+        # dotnet publish, which this build does not need.
+        run: >
+          cmake --build build --config Release
+          --target cloud_redirect cloud_redirect_cli vdf_localconfig_case_tests
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud_redirect-win-x64
+          path: |
+            build/Release/cloud_redirect.dll
+            build/Release/cloud_redirect_cli.exe
+          if-no-files-found: warn

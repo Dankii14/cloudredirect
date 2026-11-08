@@ -505,3 +505,16 @@ if(WIN32)
         DEPENDS cloud_redirect cloud_redirect_cli
     )
 endif()
+
+# ── vdf section-case regression test ────────────────────────────────────
+# Guarded separately (like pending_ops_journal_tests) so it builds without the
+# rest of the test tree. Covers the localconfig.vdf lookup used by
+# StatsStore::ReconcileLocalConfig, where Steam writes "valve" lowercase.
+if(EXISTS ${CMAKE_SOURCE_DIR}/tests/vdf_localconfig_case_tests.cpp)
+    add_executable(vdf_localconfig_case_tests
+        tests/vdf_localconfig_case_tests.cpp
+        src/common/vdf.cpp
+    )
+    target_include_directories(vdf_localconfig_case_tests PRIVATE src/common)
+    add_test(NAME vdf_localconfig_case_tests COMMAND vdf_localconfig_case_tests)
+endif()
