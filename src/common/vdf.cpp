@@ -69,6 +69,30 @@ bool ForEachFieldInSection(const std::string& vdfContent,
     return inTarget;
 }
 
+// Valve's KeyValues format treats key names case-insensitively, and Steam is
+// not consistent about capitalisation: localconfig.vdf writes the parent node
+// as lowercase "valve" under "Software", while other files use "Valve".
+// Compare the quoted key without regard to ASCII case so lookups do not depend
+// on what Steam happened to emit.
+static size_t FindQuotedKeyIgnoreCase(const std::string& content, const std::string& key,
+                                      size_t from) {
+    const std::string bare = key.substr(1, key.size() - 2);
+    for (size_t pos = content.find('"', from); pos != std::string::npos;
+         pos = content.find('"', pos + 1)) {
+        if (pos + bare.size() + 1 >= content.size()) return std::string::npos;
+        bool same = true;
+        for (size_t i = 0; i < bare.size() && same; ++i) {
+            const unsigned char a = static_cast<unsigned char>(content[pos + 1 + i]);
+            const unsigned char b = static_cast<unsigned char>(bare[i]);
+            const unsigned char al = (a >= 'A' && a <= 'Z') ? static_cast<unsigned char>(a + 32) : a;
+            const unsigned char bl = (b >= 'A' && b <= 'Z') ? static_cast<unsigned char>(b + 32) : b;
+            same = (al == bl);
+        }
+        if (same && content[pos + bare.size() + 1] == '"') return pos;
+    }
+    return std::string::npos;
+}
+
 bool FindVdfSectionRange(const std::string& vdfContent,
                          const char* const* sectionPath, size_t pathLen,
                          size_t& sectionStart, size_t& sectionEnd) {
@@ -82,7 +106,7 @@ bool FindVdfSectionRange(const std::string& vdfContent,
         size_t namePos = std::string::npos;
         size_t scan = searchPos;
         while (scan < vdfContent.size()) {
-            size_t hit = vdfContent.find(needle, scan);
+            size_t hit = FindQuotedKeyIgnoreCase(vdfContent, needle, scan);
             if (hit == std::string::npos) break;
             // Accept only at column 0 or preceded by whitespace on the same line.
             if (hit == 0) {

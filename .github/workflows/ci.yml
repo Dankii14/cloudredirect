@@ -20,7 +20,8 @@ jobs:
         # dotnet publish, which this build does not need.
         run: >
           cmake --build build --config Release
-          --target cloud_redirect cloud_redirect_cli vdf_localconfig_case_tests
+          --target cloud_redirect cloud_redirect_cli
+          pending_ops_journal_tests vdf_localconfig_case_tests
 
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
