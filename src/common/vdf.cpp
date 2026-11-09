@@ -8,6 +8,21 @@ static std::string_view StripCR(std::string_view s) {
     return s;
 }
 
+// KeyValues key names are case-insensitive by specification, and Steam is not
+// consistent about capitalisation: localconfig.vdf writes the parent node as
+// lowercase "valve" under "Software", other files use "Valve".
+static bool KeyEqualsIgnoreCase(std::string_view key, std::string_view expected) {
+    if (key.size() != expected.size()) return false;
+    for (size_t i = 0; i < key.size(); ++i) {
+        unsigned char a = static_cast<unsigned char>(key[i]);
+        unsigned char b = static_cast<unsigned char>(expected[i]);
+        if (a >= 'A' && a <= 'Z') a = static_cast<unsigned char>(a + 32);
+        if (b >= 'A' && b <= 'Z') b = static_cast<unsigned char>(b + 32);
+        if (a != b) return false;
+    }
+    return true;
+}
+
 bool ForEachFieldInSection(const std::string& vdfContent,
                            const char* const* sectionPath, int pathLen,
                            FieldCallback cb) {
@@ -52,7 +67,8 @@ bool ForEachFieldInSection(const std::string& vdfContent,
                                 if (!cb(fi)) return true;
                             }
                         }
-                    } else if (targetDepth < pathLen && depth == targetDepth && key == sectionPath[targetDepth]) {
+                    } else if (targetDepth < pathLen && depth == targetDepth &&
+                               KeyEqualsIgnoreCase(key, sectionPath[targetDepth])) {
                         targetDepth++;
                         if (targetDepth == pathLen) {
                             inTarget = true;
@@ -76,19 +92,13 @@ bool ForEachFieldInSection(const std::string& vdfContent,
 // on what Steam happened to emit.
 static size_t FindQuotedKeyIgnoreCase(const std::string& content, const std::string& key,
                                       size_t from) {
-    const std::string bare = key.substr(1, key.size() - 2);
+    const std::string_view bare(key.data() + 1, key.size() - 2);
     for (size_t pos = content.find('"', from); pos != std::string::npos;
          pos = content.find('"', pos + 1)) {
         if (pos + bare.size() + 1 >= content.size()) return std::string::npos;
-        bool same = true;
-        for (size_t i = 0; i < bare.size() && same; ++i) {
-            const unsigned char a = static_cast<unsigned char>(content[pos + 1 + i]);
-            const unsigned char b = static_cast<unsigned char>(bare[i]);
-            const unsigned char al = (a >= 'A' && a <= 'Z') ? static_cast<unsigned char>(a + 32) : a;
-            const unsigned char bl = (b >= 'A' && b <= 'Z') ? static_cast<unsigned char>(b + 32) : b;
-            same = (al == bl);
-        }
-        if (same && content[pos + bare.size() + 1] == '"') return pos;
+        const std::string_view candidate(content.data() + pos + 1, bare.size());
+        if (content[pos + bare.size() + 1] == '"' && KeyEqualsIgnoreCase(candidate, bare))
+            return pos;
     }
     return std::string::npos;
 }
