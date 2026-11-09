@@ -563,7 +563,7 @@ static void ReconcileLocalConfig(const std::string& cloudRoot, const std::string
 
             RecomputePlaytimeTotals(stats.playtime, /*allowShrink=*/true);
 
-            WriteAppStats(appId, stats, false, /*bypassDiskMerge=*/true);
+            WriteAppStats(appId, stats, /*pushCloud=*/true, /*bypassDiskMerge=*/true);
             reconciled++;
             return true;
         });
@@ -1557,8 +1557,11 @@ bool LoadAppStats(uint32_t appId, AppStats& out) {
     return true;
 }
 
-// Persist locally and, when pushCloud, queue a cloud upload. Reconcile writes
-// locally only; the cloud is written on session end, when playtime accrues.
+// Persist locally and, when pushCloud, queue a cloud upload. Reconcile queues
+// too: SeedApps flushes the account blob once after seeding, so importing
+// playtime from localconfig.vdf is the only way that time reaches other
+// devices (this store is the source of truth for namespace apps, Steam's own
+// server never sees them).
 static void WriteAppStats(uint32_t appId, const AppStats& stats, bool pushCloud,
                           bool bypassDiskMerge) {
     if (g_diskAccountId == 0) return;   // no account yet; skip disk I/O
