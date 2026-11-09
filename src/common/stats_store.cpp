@@ -2017,12 +2017,6 @@ void SeedApps(const std::vector<uint32_t>& appIds) {
         }
         ResetForAccountSwitch(acct);
     }
-    // Reconcile playtime from localconfig.vdf for the CURRENT account only.
-    // Deferred from Init (where accountId is unknown) to here (post-login).
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        ReconcileLocalConfig(g_cloudRoot, g_steamPath);
-    }
     // One network read for the whole account, not one per app. GetOrCreate then
     // reads each app's entry from the cached blob (no further network).
     RefreshCloudBlobCache();
@@ -2033,6 +2027,15 @@ void SeedApps(const std::vector<uint32_t>& appIds) {
     for (uint32_t appId : appIds) {
         if (appId == 0) continue;
         GetOrCreate(appId);  // merges cached cloud blob + imports native + loads local
+    }
+    // Reconcile playtime from localconfig.vdf for the CURRENT account only.
+    // Deferred from Init (where accountId is unknown) to here (post-login), and
+    // deliberately AFTER the cloud pull so the shortfall is computed against
+    // cloud playtime too, and so the entries it queues survive the refresh
+    // (RefreshCloudBlobCache replaces the per-app map).
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        ReconcileLocalConfig(g_cloudRoot, g_steamPath);
     }
     // Write .bin files for SLSsteam's NO_CONNECTION fallback — only when
     // achievement sync is on (the .bin carries achievement state, not playtime).
